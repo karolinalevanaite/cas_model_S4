@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <title>CAS Model - Updated Structure (Socio-political Fully Connected)</title>
+</head>
+<body>
+  <div id="plot" style="width: 100%; height: 100vh;"></div>
+  <script>
+    const scale = 3;
+
+    const nodes = [
+      { id: "Translation", x: 0, y: 0, z: 0, color: '#1f77b4' },
+      { id: "Translator", x: 3, y: 0, z: 0, color: '#1f77b4' },
+      { id: "Translator's Work", x: 1.5, y: 2.6, z: 0, color: '#1f77b4' },
+      { id: "Technologies", x: 2, y: 0.5, z: 1, color: '#ff7f0e' },
+      { id: "Industry", x: 2, y: -0.5, z: 1, color: '#ff7f0e' },
+      { id: "Cultural and Linguistic Diversity", x: -1, y: 0.5, z: 1, color: '#2ca02c' },
+      { id: "Communication", x: 0, y: 2, z: 1, color: '#d62728' },
+      { id: "Education", x: 1, y: 2, z: 1, color: '#d62728' },
+      { id: "Economic Factors", x: 3.5, y: 0, z: 2, color: '#9467bd' },
+      { id: "Socio-political Factors", x: -2, y: 0, z: 2, color: '#8c564b' },
+
+      { id: "Personal and Interpersonal Competence", x: -2, y: 0, z: 0.5, color: '#17becf' },
+      { id: "Competence in Culture and Language", x: -2, y: 1, z: 0.7, color: '#17becf' },
+      { id: "Service Provision Competence", x: -2, y: -1, z: 1, color: '#17becf' },
+      { id: "Technological Competence", x: -2, y: 1.5, z: 1.5, color: '#17becf' },
+      { id: "Translation Competence", x: -2, y: -1.5, z: 1.7, color: '#17becf' },
+      { id: "Personal Dispositions", x: -2, y: 0.5, z: 1.3, color: '#17becf' },
+      { id: "Other Competences", x: -2, y: -0.5, z: 0.2, color: '#17becf' },
+
+      { id: "Risk", x: 6, y: 0, z: 0.5, color: '#bcbd22' },
+      { id: "Ethics", x: 6, y: 1, z: 0.7, color: '#bcbd22' },
+      { id: "Perception", x: 6, y: 0.5, z: 1.3, color: '#bcbd22' },
+      { id: "Human-in-the-loop", x: 6, y: -0.5, z: 1.5, color: '#bcbd22' }
+    ].map(n => ({
+      ...n,
+      x: n.x * scale,
+      y: n.y * scale,
+      z: n.z * scale
+    }));
+
+    const competenceIds = nodes.filter(n => n.color === '#17becf').map(n => n.id);
+    const riskLayerIds = nodes.filter(n => n.color === '#bcbd22').map(n => n.id);
+    const baseAgents = ["Translation", "Translator", "Translator's Work"];
+    const topAgents = ["Economic Factors", "Socio-political Factors"];
+    const human = "Human-in-the-loop";
+
+    const edges = [
+      ["Translation", "Translator"], 
+      ["Translation", "Translator's Work"], 
+      ["Translator", "Translator's Work"],
+
+      ["Technologies", "Industry"], 
+      ["Technologies", "Cultural and Linguistic Diversity"],
+      ["Industry", "Cultural and Linguistic Diversity"], 
+      ["Communication", "Technologies"],
+      ["Communication", "Industry"], 
+      ["Communication", "Cultural and Linguistic Diversity"],
+      ["Education", "Technologies"], 
+      ["Education", "Industry"], 
+      ["Education", "Cultural and Linguistic Diversity"],
+
+      ...["Technologies", "Industry", "Cultural and Linguistic Diversity", "Communication", "Education"]
+        .flatMap(n => baseAgents.map(t => [n, t])),
+
+      ["Economic Factors", "Socio-political Factors"],
+      ["Economic Factors", "Technologies"], 
+      ["Economic Factors", "Industry"],
+
+      ...nodes
+        .map(n => n.id)
+        .filter(id => id !== "Socio-political Factors")
+        .map(id => ["Socio-political Factors", id]),
+
+      ...competenceIds.flatMap(c1 =>
+        competenceIds.map(c2 => c1 !== c2 ? [c1, c2] : null)
+      ).filter(Boolean),
+
+      ...competenceIds.flatMap(c => baseAgents.map(t => [c, t])),
+
+      ...riskLayerIds.flatMap(r1 =>
+        riskLayerIds.map(r2 => r1 !== r2 ? [r1, r2] : null)
+      ).filter(Boolean),
+
+      ...riskLayerIds.flatMap(r =>
+        [...topAgents, ...competenceIds, ...baseAgents]
+          .map(other => [r, other])
+      ),
+
+      ...["Risk", "Ethics", "Perception", "Economic Factors", "Industry", "Technologies", ...baseAgents]
+        .map(a => [human, a])
+    ];
+
+    const edgeTraces = edges.map(([src, tgt]) => {
+      const from = nodes.find(n => n.id === src);
+      const to = nodes.find(n => n.id === tgt);
+      return {
+        type: "scatter3d",
+        mode: "lines",
+        x: [from.x, to.x],
+        y: [from.y, to.y],
+        z: [from.z, to.z],
+        line: { width: 0.5, color: "#ccc" },
+        hoverinfo: "none"
+      };
+    });
+
+    const nodeTrace = {
+      type: "scatter3d",
+      mode: "markers+text",
+      x: nodes.map(n => n.x),
+      y: nodes.map(n => n.y),
+      z: nodes.map(n => n.z),
+      marker: { size: 8, color: nodes.map(n => n.color) },
+      text: nodes.map(n => n.id),
+      textposition: "top center",
+      hoverinfo: "text"
+    };
+
+    function circularPlane(center, radius, resolution, axis, color) {
+      const theta = [...Array(resolution).keys()].map(i => (2 * Math.PI * i) / (resolution - 1));
+      const r = [...Array(resolution).keys()].map(i => (radius * i) / (resolution - 1));
+      const x = [], y = [], z = [];
+
+      for (let i = 0; i < r.length; i++) {
+        const rowX = [], rowY = [], rowZ = [];
+        for (let j = 0; j < theta.length; j++) {
+          const xi = r[i] * Math.cos(theta[j]);
+          const yi = r[i] * Math.sin(theta[j]);
+          if (axis === 'z') {
+            rowX.push(center[0] + xi);
+            rowY.push(center[1] + yi);
+            rowZ.push(center[2]);
+          } else if (axis === 'x') {
+            rowX.push(center[0]);
+            rowY.push(center[1] + xi);
+            rowZ.push(center[2] + yi);
+          }
+        }
+        x.push(rowX);
+        y.push(rowY);
+        z.push(rowZ);
+      }
+
+      return {
+        type: "surface",
+        x, y, z,
+        opacity: 0.08,
+        showscale: false,
+        colorscale: [[0, color], [1, color]],
+        hoverinfo: "none"
+      };
+    }
+
+    const layerPlanes = [
+      circularPlane([1.5 * scale, 1.3 * scale, 0], 4.5 * scale, 50, "z", "blue"),
+      circularPlane([1.5 * scale, 1.3 * scale, 3], 4.5 * scale, 50, "z", "orange"),
+      circularPlane([1.5 * scale, 1.3 * scale, 6], 4.5 * scale, 50, "z", "purple"),
+      circularPlane([-6 * scale, 3 * scale, 3], 2.5 * scale, 50, "x", "cyan"),
+      circularPlane([6 * scale, 3 * scale, 3], 2.5 * scale, 50, "x", "yellow")
+    ];
+
+    Plotly.newPlot("plot", [...layerPlanes, ...edgeTraces, nodeTrace], {
+      margin: { l: 0, r: 0, b: 0, t: 0 },
+      scene: {
+        xaxis: { visible: false },
+        yaxis: { visible: false },
+        zaxis: { visible: false }
+      }
+    });
+
+    let theta = 0;
+    let phi = 0;
+
+    const rotationInterval = setInterval(() => {
+      theta += 0.01;
+      phi += 0.02;
+
+      const R = 0.8;
+      const r = 0.4;
+
+      const camera = {
+        eye: {
+          x: (R + r * Math.cos(phi)) * Math.cos(theta),
+          y: (R + r * Math.cos(phi)) * Math.sin(theta),
+          z: r * Math.sin(phi) + 0.5
+        }
+      };
+
+      Plotly.relayout("plot", { "scene.camera": camera });
+    }, 50);
+
+    // Freeze after 11 seconds
+    setTimeout(() => {
+      clearInterval(rotationInterval);
+
+      const nodeTraceIndex = layerPlanes.length + edgeTraces.length;
+
+      function animate(duration, update){
+        const start = Date.now();
+        const interval = setInterval(()=>{
+          const t = Math.min((Date.now() - start) / duration, 1);
+          update(t);
+          if(t >= 1){
+            clearInterval(interval);
+          }
+        }, 50);
+      }
+
+      // STEP 2 — 4 seconds (11s → 15s)
+      animate(4000, (t) => {
+
+        const sizes = nodes.map(n => {
+          if (n.id === "Technologies" || n.id === "Socio-political Factors") {
+            return 8 + (16 * t);
+          }
+          return 8;
+        });
+
+        const colors = nodes.map(n => {
+          if (n.id === "Technologies" || n.id === "Socio-political Factors") {
+            const fade = 1 - t;
+            return "rgb(" +
+              Math.round(255 * fade) + "," +
+              Math.round(127 * fade) + "," +
+              Math.round(14 * fade) + ")";
+          }
+          return n.color;
+        });
+
+        Plotly.restyle("plot", {
+          "marker.size": [sizes],
+          "marker.color": [colors]
+        }, [nodeTraceIndex]);
+
+      });
+
+    }, 11000);
+
+    // STEP 3 — edges turn transparent exactly at 17 seconds
+    setTimeout(() => {
+      edges.forEach((e, i) => {
+        Plotly.restyle("plot", {
+          "line.color": "rgba(204,204,204,0)"
+        }, [layerPlanes.length + i]);
+      });
+    }, 17000);
+
+  </script>
+</body>
+</html>
